@@ -1369,7 +1369,7 @@ var tablemaker = {
 				}
 				ret += '\n';
 			}
-			ret = ret.substr(ret.length - 1, 1);	// 最終行の改行コード削除
+			ret = ret.substr(0, ret.length - 1);	// 最終行の改行コード削除
 		}
 		return ret;
 	},
@@ -1406,7 +1406,7 @@ var tablemaker = {
 				}
 				ret += '\n';
 			}
-			ret = ret.substr(ret.length - 1, 1);	// 最終行の改行コード削除
+			ret = ret.substr(0, ret.length - 1);	// 最終行の改行コード削除
 		}
 		return ret;
 	},
@@ -1643,7 +1643,7 @@ if (seltext) {
 //teststr += '|~|~|1分 6秒|1|1|33|\n';
 //teststr += '|a|a|1分11秒|5275|181|~|\n';
 //teststr += '|Vanguard Liberator|4分 3秒|4分 3秒|180|180|~|f\n';
-//var ret = tablemaker.make(teststr, 4);
+//var ret = tablemaker.make(teststr, 0);
 //var f = v2c.getScriptDataFile('resultTable.txt');
 //v2c.writeStringToFile(f, ret);
 
