@@ -932,6 +932,7 @@ var KeisenRule = {
 				if (!coltmp.top)
 					break;
 			}
+			if (!coltmp) { coltmp = cell; }
 			var tmp = cell;
 			while (tmp = tmp.bottom) { if (tmp.rawText.textDots > max) max = tmp.rawText.textDots; }
 			if (cell.textDots > max) {
@@ -944,14 +945,18 @@ var KeisenRule = {
 				tmp = coltmp;
 				var n;
 				do {
-					n = tmp.keisenLinks.top.text;
-					tmp.keisenLinks.top.text = n.substr(0, n.length - num);
+					if (tmp.keisenLinks.top) {
+						n = tmp.keisenLinks.top.text;
+						tmp.keisenLinks.top.text = n.substr(0, n.length - num);
+					}
 					if (tmp === cell) { continue; }
 					tmp.width -= cbk;
 					if (!tmp.bottom) break;
 				} while (tmp = tmp.bottom);
-				n = tmp.keisenLinks.bottom.text;
-				tmp.keisenLinks.bottom.text = n.substr(0, n.length - num);
+				if (tmp.keisenLinks.bottom) {
+					n = tmp.keisenLinks.bottom.text;
+					tmp.keisenLinks.bottom.text = n.substr(0, n.length - num);
+				}
 				w -= cbk;
 			}
 			
@@ -1460,7 +1465,6 @@ var tablemaker = {
 						case 'b' : nextline = true; break;
 						default : break;
 					}
-					items[items.length - 1] = '';
 				} else {
 					if (style.match(/c/i)) {
 						for (var j = 1; j < items.length - 1; j++) {
@@ -1476,6 +1480,7 @@ var tablemaker = {
 						continue;
 					}
 				}
+				items[items.length - 1] = '';
 			}
 			if (items[0].length == 0) {
 				items.splice(0, 1);
@@ -1545,6 +1550,9 @@ var tablemaker = {
 				}
 				if (i > 0) {
 					cell.top = rows[i - 1][j];
+					if (rows[i - 1][j] === undefined) {
+						log('{0} = {1}', i - 1, j);
+					}
 					rows[i - 1][j].bottom = cell;
 					if (rows[i - 1][j].keisenLinks.leftBottom) {
 						cell.keisenLinks.leftTop = rows[i - 1][j].keisenLinks.leftBottom;
