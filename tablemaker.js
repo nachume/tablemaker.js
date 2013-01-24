@@ -1492,13 +1492,13 @@ var tablemaker = {
 				var str = items[j];
 				if (str.match(/^LEFT:/i)) {
 					ma = LEFT;
-					str.substring(5);
+					str = str.substring(5);
 				} else if (str.match(/^CENTER:/i)) {
 					ma = CENTER;
-					str.substring(7);
+					str = str.substring(7);
 				} else if (str.match(/^RIGHT:/i)) {
 					ma = RIGHT;
-					str.substring(6);
+					str = str.substring(6);
 				}
 				if (borderStyle >= 2) {
 					if (str == '>') {
