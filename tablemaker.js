@@ -1,6 +1,6 @@
 //【登録場所】選択テキスト
 //【ラベル】選択範囲を表に変換する
-//【更新日】2013/01/25 (version 0.80 alpha)
+//【更新日】2013/01/26 (version 0.80b alpha)
 //【コマンド】$SCRIPT tablemaker.js $TAILCUT
 //【コマンド】[↑がオススメ。コピペも出来てコンパクト。テンプレ用途]
 //【コマンド】$SCRIPT tablemaker.js $USE_UNICODE $STYLE(0) $TAILCUT
@@ -28,6 +28,7 @@
 //    [未実装]     $STYLE(51) … 「╋━╋」な罫線を内枠・外枠に使用して表を作成する。 ( $STYLE(5) だとこれ )
 //
 //【内容】選択範囲のpukiwikiライクな書式のテキストを罫線表に変換する 
+// ■ワンポイントアドバイス…変換した後、表を元の文字列に戻したい場合は「CTRL + Z 」キーを２回押すと戻せる
 //
 // ■表の描き方…V2C書き込み欄の本文に以下の書式にしたがって描いた文字列を選択範囲で囲って外部コマンドを実行する
 // ・例：「|」で挟んで各セルを書く。末尾に「b」を付けると次の行に水平線を挿入する(罫線モード時は罫線行を挿入する)
@@ -69,16 +70,54 @@
 // [未実装] ■post.jsでに実装して本文中で「!table」みたいなコマンドを入れて書き込むと
 // 表に変換する機能。(変換したあと書き込みはキャンセルさせる。書き込み欄が表に変わってるので
 // 再度書き込みボタン押すと書き込めるみたいな
-var DEBUG = undefined;
+(function() { var DEBUG = undefined, MODE = (function() { DEBUG = 0; main(); });
+// --[ 設定ここから ]--------------------------------------------------------
+
+// デバッグ時は以下のモードのいずれかの先頭の「//」を消す
+//MODE = (function() { DEBUG = 1; main(); });  // 通常実行だけどデバッグ文字列スクリプトコンソールを出力する
+//MODE = (function() { DEBUG = 1; debug(); }); // デバッグモード (入力文字固定で、V2C書き込み欄の本文に出力結果を書き出す。)
+//MODE = (function() { DEBUG = 0; debug(); }); // 処理時間計測モード
+
+// --[ 設定ここまで ]--------------------------------------------------------
+
+var STOREMES = [];
 function log(format /*, ...*/)
 {
 	var args = arguments;
 	var message = format.replace(/\{(\d)\}/g, function(m, c) { return args[parseInt(c) + 1]; });
-
-	v2c.println("[tablemaker.js] " + message);
+	v2c.println("[tablemaker.js] " +message);
+}
+function put(format /*, ...*/)
+{
+	var args = arguments;
+	var message = format.replace(/\{(\d)\}/g, function(m, c) { return args[parseInt(c) + 1]; });
+	STOREMES.push(message);
+}
+function getStoreString()
+{
+	if (DEBUG) {
+		var ret = '';
+		while(STOREMES.length > 0) {
+			ret += STOREMES.shift();
+		}
+		return ret;
+	}
 }
 
-(function() {
+function logFunc(func, format /*, ...*/)
+{
+	if (DEBUG) {
+		var args = arguments;
+		var message = format.replace(/\{(\d)\}/g, function(m, c) { return args[parseInt(c) + 2]; });
+
+		var name = func;
+		if (typeof func == 'function') {
+			name = func.name;
+		}
+		v2c.println("[tablemaker.js:" +  name + "()] " + message);
+	}
+}
+
 var USE_UNICODE = false;
 var TAILCUT = false;
 var SEPARATOR = '|';
@@ -785,6 +824,7 @@ function KeisenObject()
 }
 
 var KeisenRule = {
+	RuleName : 'KeisenRule',
 	DefineHorizontalLine : function(cell, hAlign, isBold) {
 		var base = '';
 		if (!cell.mergeLinks[hAlign]) {
@@ -910,10 +950,29 @@ var KeisenRule = {
 		return this.DefineCorner(cell, 'right', 'bottom', (cell.bottom && (cell.header || cell.bottom.footer || cell.nextline)));
 	},
 	MergeMove : function(ltCell) {
-		if (!ltCell.isMergeable ) { return false; }
+		// mergeLinks.rightがない。かつleftかbottomがある。つまり右上基点にしたほうが処理に無駄がないかも…
+		// そのうち直す
+		if (!ltCell.isMergeable ) { 
+			if (DEBUG) {
+				if (STOREMES.length > 0) {
+					logFunc('MergeMove', '{0}　なし、または処理済み。', getStoreString());
+				}
+			}
+			return false;
+		}
 		var cell = ltCell;
 		var lines = 1;
 		var w = 0;
+		if (DEBUG) {
+			var debug_num = 0;
+			var debug_tmp = ltCell;
+			do { debug_num++; } while (debug_tmp = debug_tmp.mergeLinks.bottom);
+			put('　[結合セル:(行数={0}×', debug_num);
+			debug_num = 0;
+			debug_tmp = ltCell;
+			do { debug_num++; } while (debug_tmp = debug_tmp.mergeLinks.right);
+			put('列数={0})]', debug_num);
+		}
 		if (ltCell.mergeLinks.right) {
 			while (cell.mergeLinks.right) {
 				w += cell.width + 16;
@@ -923,7 +982,7 @@ var KeisenRule = {
 				cell.mergeLinks.left = null;
 			}
 			
-			// 結合によるセル幅の再計算
+			// 結合による列幅の再計算
 			var max = 0;
 			var coltmp = cell;
 			while (coltmp = coltmp.top) { 
@@ -938,10 +997,12 @@ var KeisenRule = {
 			if (cell.textDots > max) {
 				var num = Math.floor((cell.textDots - max) >> 4);
 				var cbk = num << 4;
-				var lbk = Math.floor(w >> 4) << 4;
+				var lbk = (w >> 4) << 4;
 				if (cbk > lbk) {
 					cbk = lbk;
+					num = lbk >> 4;
 				}
+				put('[結合による列幅の調整:width({0} → {1})、引かれる罫線文字数:{2}]', coltmp.width, coltmp.width - cbk, num);
 				tmp = coltmp;
 				var n;
 				do {
@@ -959,8 +1020,9 @@ var KeisenRule = {
 				}
 				w -= cbk;
 			}
-			
 			cell.width = w = cell.width + w;
+			put('[結合後のセル幅:width={0}]', w);
+			logFunc('MergeMove', '{0}', getStoreString());
 			tmp = cell;
 			while (tmp = tmp.mergeLinks.bottom) {
 				lines += 2;
@@ -978,16 +1040,21 @@ var KeisenRule = {
 				tmp.mergeLinks.top.mergeLinks.bottom = null;
 				tmp.mergeLinks.top = null;
 			}
+			logFunc('MergeMove', '　　　結合セルの罫線を空白に変更しました。');
 			// 結合セルの上下の中央に文字列を移動させる。　+1で4の倍数ならkeisenLinks.topに書き込む(奇数セル単位行)、それ以外はtext
 			var idx = Math.floor((lines + 1) / 4);
 			if (idx > 0) {
+				put('このセル基点で行数＋{0}のセル',idx);
 				tmp = cell;
 				while (idx--) { tmp = tmp.bottom; }
 				if ((lines + 1) % 4 == 0) {
 					tmp.keisenLinks.top.text = cell.getPaddingText();
+					put('の罫線行(上)に');
 				} else {
 					tmp.text = cell.text;
+					put('に');
 				}
+				logFunc('MergeMove', '　　　{0}セルの文字列を再配置しました。', getStoreString());
 				if (cell != tmp) {
 					cell.text = '';
 				}
@@ -1002,21 +1069,30 @@ var KeisenRule = {
 				tmp.mergeLinks.top.mergeLinks.bottom = null;
 				tmp.mergeLinks.top = null;
 			}
+			logFunc('MergeMove', '　　　結合セルの罫線を空白に変更しました。');
 			var idx = Math.floor((lines + 1) / 4);
 			if (idx > 0) {
+				put('このセル基点で行数＋{0}のセル',idx);
 				tmp = cell;
 				while (idx--) { tmp = tmp.bottom; }
 				if ((lines + 1) % 4 == 0) {
+					put('の罫線行(上)に');
 					tmp.keisenLinks.top.text = cell.getPaddingText();
 				} else {
+					put('に');
 					tmp.text = cell.text;
 				}
+				logFunc('MergeMove', '　　　{0}セルの文字列を再配置しました。', getStoreString());
 				if (cell != tmp) {
 					cell.text = '';
 				}
 			}
 		}
-
+		if (DEBUG) {
+			if (STOREMES.length > 0) {
+				logFunc('MergeMove', '{0}', getStoreString());
+			}
+		}
 		return true;
 	},
 	detectWidthCellsForBorder : function(cell, width) {
@@ -1269,18 +1345,22 @@ var tablemaker = {
 		this.minwidth = 16;
 		this.maxwidthColumn = [];
 		var ret = '';
+		put('[STYLE = {0}][[Separetor = {1}][TAILCUT = {2}][PREVIEW = {3}][USE_UNICODE = {4}]',
+		 borderStyle, SEPARATOR, TAILCUT, PREVIEW, USE_UNICODE);
+		
 		switch (borderStyle) {
-			case 0 :
-				ret = this.makeSpaceTable(11);
-				break;
 			case 1 :
+				logFunc('make', '{0}[Rule = なし]  空白のみの表作成を開始します。', getStoreString());
 				ret = this.makeSeparatorTable(SEPARATOR);
 				break;
 			case 4 :
 			case 41:
+				logFunc('make', '{1}[Rule = {0}] 罫線を使用して表作成を開始します。', KeisenRule.RuleName, getStoreString());
 				ret = this.makeBorderTable();
 				break;
+			case 0 :
 			default :
+				logFunc('make', '{0}[Rule = なし] 空白のみの表作成を開始します。', getStoreString());
 				ret = this.makeSpaceTable(11);
 				break;
 		}
@@ -1297,10 +1377,12 @@ var tablemaker = {
 		}
 		if (cells && cells.length > 0 && cells[0] && cells[0].length > 0) {
 			// 文字ドット数の余剰分カラムサイズを補正する
+			
 			for (var col = 0; col < cwmax.length; col++) {
 				cwmax[col] = rule.detectWidthCellsForBorder(cells[0][col], cwmax[col]);
+				put('[width = {0}]', cwmax[col]);
 			}
-
+			logFunc('makeBorderTable', '{0}　列の最大幅を仮決定しました。結合時は変更する可能性があります。', getStoreString());
 			// 罫線の作成
 			for (var row = 0; row < cells.length; row++) {
 				for (var col = 0; col < cwmax.length; col++) {
@@ -1309,28 +1391,36 @@ var tablemaker = {
 					item.keisenLinks.left.text = rule.Left(item);
 					var c = rule.Top(item);
 					var t = cwmax[col];
-					do { item.keisenLinks.top.text += c; } while (t -= 16);
+					put('　罫線リンク → ({4}, {5}) [左上="{1}"][上="{2}"×{3}][左="{0}"]', item.keisenLinks.left.text, item.keisenLinks.leftTop.text, c, Math.floor(t / 16), row, col);
+					while (t > 0) { item.keisenLinks.top.text += c; t -= 16; } 
 					if (!item.right) {
 						item.keisenLinks.rightTop.text = rule.RightTop(item);
 						item.keisenLinks.right.text = rule.Right(item);
+						put('[右上="{0}"][右="{1}"]', item.keisenLinks.rightTop.text, item.keisenLinks.right.text);
 					}
 					if (!item.bottom) {
 						item.keisenLinks.leftBottom.text = rule.LeftBottom(item);
 						c = rule.Bottom(item);
 						t = cwmax[col];
-						do { item.keisenLinks.bottom.text += c; } while (t -= 16);
+						put('[下="{0}"×{1}]', c, Math.floor(t / 16));
+						while (t > 0) { item.keisenLinks.bottom.text += c; t -= 16; }
 						if (!item.right) {
+							put('[右下="{0}"]', item.keisenLinks.rightBottom.text);
 							item.keisenLinks.rightBottom.text = rule.RightBottom(item);
 						}
 					}
+					logFunc('makeBorderTable', '{0}', getStoreString());
 				}
 			}
+			logFunc('makeBorderTable', '列幅に基いて罫線リンクに罫線文字列を仮生成しました。');
 			// 罫線を結合する
 			for (var row = 0; row < cells.length; row++) {
 				for (var col = 0; col < cwmax.length; col++) {
+						put('　結合リンク → ({0}, {1})', row, col);
 						rule.MergeMove(cells[row][col]);
 				}
 			}
+			logFunc('makeBorderTable', '結合リンクに基いて罫線文字列を置換、及びセル文字列を移動しました。');
 			// 描画
 			var t;
 			for (var row = 0; row < cells.length; row++) {
@@ -1349,7 +1439,8 @@ var tablemaker = {
 			} while (t = t.right);
 			t = cells[cells.length - 1][cwmax.length - 1];
 			ret += t.keisenLinks.rightBottom.text;
-		}
+			logFunc('makeBorderTable', '表文字列の変換処理が完了しました。');
+		} else { logFunc('makeBorderTable', '入力文字列からセルが作成できませんでした。\n----\n{0}\n----', this.text); }
 		return ret;
 	},
 	// 区切り文字を使用したテーブル
@@ -1358,14 +1449,18 @@ var tablemaker = {
 		var cells = this.convCells(this.text, 1);
 		if (cells && cells.length > 0 && cells[0] && cells[0].length > 0) {
 			for (var col = 0; col < cells[0].length; col++) {
-				this.detectWidthCells(cells, col, this.maxwidthColumn[col]);
+				var tmp = this.detectWidthCells(cells, col, this.maxwidthColumn[col]);
+				put('[width = {0}]', tmp);
 			}
-			
+			logFunc('makeSeparatorTable', '{0}　列の最大幅を決定しました。', getStoreString());
 			if (TAILCUT) {
 				var endidx = cells[0].length - 1;
 				for (var row = 0; row < cells.length; row++) {
+					put('[({1},{2})_PaddingR: {0}', cells[row][endidx].rawText.paddingRight.width, row, endidx);
 					cells[row][endidx].rawText.paddingRight.width = 0;
+					put(' → {0}]', cells[row][endidx].rawText.paddingRight.width);
 				}
+				logFunc('makeSeparatorTable', '{0}　$TAILCUT指定なので各行の末尾の空白を削除しました。', getStoreString());
 			}
 			for (var row = 0; row < cells.length; row++) {
 				for (var col = 0; col < cells[row].length; col++) {
@@ -1375,7 +1470,8 @@ var tablemaker = {
 				ret += '\n';
 			}
 			ret = ret.substr(0, ret.length - 1);	// 最終行の改行コード削除
-		}
+			logFunc('makeSeparatorTable', '表文字列の変換処理が完了しました。');
+		} else { logFunc('makeSeparatorTable', '入力文字列からセルが作成できませんでした。\n----\n{0}\n----', this.text); }
 		return ret;
 	},
 	// 空白のみのコンパクトなテーブル
@@ -1389,20 +1485,27 @@ var tablemaker = {
 		if (cells && cells.length > 0 && cells[0] && cells[0].length > 0) {
 			for (var col = 0; col < cells[0].length; col++) {
 				var tmp = this.detectWidthCells(cells, col, cwmax[col]);
-				// if (tmp >= 0) { cwmax[col] = tmp; }
+				put('[width = {0}]', tmp);
 			}
+			logFunc('makeSpaceTable', '{0}　列の最大幅を決定しました。', getStoreString());
 			// 各セルの向かい合ったPaddingを結合してゴミを出にくくする
 			for (var row = 0; row < cells.length; row++) {
 				for (var col = 0; col < cells[row].length; col++) {
 					var item = cells[row][col];
-					if (item.right && item.rawText.paddingRight.width > 0 && item.right.rawText.paddingLeft.width > 0) {
-						item.right.rawText.paddingLeft.width += item.rawText.paddingRight.width;
-						item.rawText.paddingRight.width = 0;
+					put('[');
+					if (item.left && item.rawText.paddingLeft.width > 0 && item.left.rawText.paddingRight.width > 0) {
+						put('←のPaddingR({0})とPaddingL({1})を結合:', item.left.rawText.paddingRight.width, item.rawText.paddingLeft.width);
+						item.rawText.paddingLeft.width += item.left.rawText.paddingRight.width;
+						item.left.rawText.paddingRight.width = 0;
+						put('{0}', item.rawText.paddingLeft.width);
 					}
 					if (TAILCUT && (!item.right)) {
 						item.rawText.paddingRight.width = 0;
+						put('$TAILCUTの為末尾を削除 PaddingR: {0}', item.rawText.paddingRight.width);
 					}
+					put('_]');
 				}
+				logFunc('makeSpaceTable', 'Paddingの最適化 → {0}', getStoreString());
 			}
 			// 描画
 			for (var row = 0; row < cells.length; row++) {
@@ -1412,7 +1515,8 @@ var tablemaker = {
 				ret += '\n';
 			}
 			ret = ret.substr(0, ret.length - 1);	// 最終行の改行コード削除
-		}
+			logFunc('makeSpaceTable', '表文字列の変換処理が完了しました。');
+		} else { logFunc('makeSpaceTable', '入力文字列からセルが作成できませんでした。\n----\n{0}\n----', this.text); }
 		return ret;
 	},
 	detectWidthCells : function(cells, columnIndex, width)
@@ -1445,6 +1549,7 @@ var tablemaker = {
 			}
 		}
 		var colNum = lnArray[0].split('|').length - 2;
+		logFunc('convCells', '[行数 = {1}][列数 = {0}] 入力文字列から行列数を取得しました。', colNum, lnArray.length);
 		var aligns = new Array(colNum);
 		this.maxwidthColumn = new Array(colNum);
 		for (var i = 0; i < colNum; i++) {
@@ -1460,49 +1565,70 @@ var tablemaker = {
 			if (style.length > 0) {
 				if (style.match(/(h|f|b)/i)) {
 					switch (RegExp.$1) {
-						case 'h' : header = true; break;
-						case 'f' : footer = true; break;
-						case 'b' : nextline = true; break;
-						default : break;
+						case 'h' : 
+							header = true;
+							put('ヘッダー行 → ');
+							break;
+						case 'f' :
+							footer = true;
+							put('フッター行 → ');
+							break;
+						case 'b' :
+							nextline = true;
+							put('通常行(+<BR>) → ');
+							break;
+						default :
+							break;
 					}
 				} else {
 					if (style.match(/c/i)) {
+						put('　');
 						for (var j = 1; j < items.length - 1; j++) {
+							put('[');
 							if (items[j].match(/LEFT/i)) { 
 								aligns[j - 1] = LEFT;
+								put('左');
 							} else if (items[j].match(/CENTER/i)) {
 								aligns[j - 1] = CENTER;
+								put('中');
 							} else if (items[j].match(/RIGHT/i)) {
 								aligns[j - 1] = RIGHT;
+								put('右');
 							}
+							put('_]');
 						}
+						logFunc('convCells', '　スタイル指定行 → {0}', getStoreString());
 						lnArray.splice(i--, 1);
+						logFunc('convCells', '[行数 = {1}][列数 = {0}] スタイル指定行を削除して行列数を変更しました。', colNum, lnArray.length);
 						continue;
 					}
 				}
-				items[items.length - 1] = '';
+			} else {
+				put('通常行 → ');
 			}
-			if (items[0].length == 0) {
-				items.splice(0, 1);
-			}
-			if (items[items.length - 1].length == 0) {
-				items.splice(items.length - 1, 1);
-			}
+			
+			items.splice(0, 1);
+			items.splice(items.length - 1, 1);
+
 			var row = [];
 			var hmergePrev = false;
 			for (var j = 0; j < items.length; j++) {
+				put('[');
 				var hmerge = false;
 				var vmerge = false;
 				var ma = aligns[j];
 				var str = items[j];
 				if (str.match(/^LEFT:/i)) {
 					ma = LEFT;
+					put('左:');
 					str = str.substring(5);
 				} else if (str.match(/^CENTER:/i)) {
 					ma = CENTER;
+					put('中:');
 					str = str.substring(7);
 				} else if (str.match(/^RIGHT:/i)) {
 					ma = RIGHT;
+					put('右:');
 					str = str.substring(6);
 				}
 				if (borderStyle >= 2) {
@@ -1550,9 +1676,6 @@ var tablemaker = {
 				}
 				if (i > 0) {
 					cell.top = rows[i - 1][j];
-					if (rows[i - 1][j] === undefined) {
-						log('{0} = {1}', i - 1, j);
-					}
 					rows[i - 1][j].bottom = cell;
 					if (rows[i - 1][j].keisenLinks.leftBottom) {
 						cell.keisenLinks.leftTop = rows[i - 1][j].keisenLinks.leftBottom;
@@ -1593,11 +1716,13 @@ var tablemaker = {
 				if (vmerge) {
 					cell.mergeLinks.top = cell.top;
 					cell.top.mergeLinks.bottom = cell;
+					put('↑と結合:');
 					vmerge = false;
 					if (cell.left && cell.left.mergeLinks.top) {
 						var tmp = cell;
 						while (tmp = tmp.mergeLinks.top) { if (!tmp.mergeLinks.top) { break; } }
 						if (tmp.mergeLinks.left) {
+							put('←と結合:');
 							cell.mergeLinks.left = cell.left;
 							cell.left.mergeLinks.right = cell;
 						}
@@ -1606,58 +1731,66 @@ var tablemaker = {
 				if (hmergePrev) {
 					cell.mergeLinks.left = cell.left;
 					cell.left.mergeLinks.right = cell;
+					put('←と結合:');
 					hmergePrev = false;
 				}
 				if (hmerge) {
 					hmergePrev = true;
 				}
+				put('_{0}]', cell.text);
 				row.push(cell);
 			}
+			logFunc('convCells', '　{0}', getStoreString());
 			rows.push(row);
 		}
+		logFunc('convCells', '文字列からCellに変換できました。');
 		return rows;
 	}
 };
-
-// var DEBUG = true;
-if (DEBUG === undefined || (!DEBUG)) { // 実行メイン -----------------
-var vcx = v2c.context;
-var wp = vcx.thread.openWritePanel();
-var tc = wp.message;
-var seltext = String(tc.selText);
-if (seltext) {
-	var ret = tablemaker.make(seltext, STYLE);
-	if (ret) {
-		var ss = tc.selStart;
-		var en = tc.selEnd;
-		var tt = String(tc.text);
-		if (tt.charAt(ss) == '\n') { ss++; }
-		if (tt.length != en && tt.charAt(en) != '\n') { ret += '\n'; }
-		tc.text = tt.substring(0, ss) + ret + tt.substring(en);
-		if (PREVIEW) {
-			wp.preview = true;
+function main()
+{
+	var vcx = v2c.context;
+	var wp = vcx.thread.openWritePanel();
+	var tc = wp.message;
+	var seltext = String(tc.selText);
+	if (seltext) {
+		var ret = tablemaker.make(seltext, STYLE);
+		if (ret) {
+			var ss = tc.selStart;
+			var en = tc.selEnd;
+			var tt = String(tc.text);
+			if (tt.charAt(ss) == '\n') { ss++; }
+			if (tt.length != en && tt.charAt(en) != '\n') { ret += '\n'; }
+			tc.text = tt.substring(0, ss) + ret + tt.substring(en);
+			if (PREVIEW) {
+				wp.preview = true;
+			}
 		}
 	}
 }
+function debug()
+{
+	//var teststr = '';
+	//teststr += '|CENTER:|CENTER:|CENTER:|CENTER:|CENTER:|CENTER:|c\n';
+	//teststr += '|キャラクタ|戦闘時間計|平均戦闘時間|総経験値|平均|討伐数|h\n';
+	//teststr += '|LEFT:|CENTER:|RIGHT:|RIGHT:|RIGHT:|RIGHT:|c\n';
+	//teststr += '|Nightmare Funguar|33分51秒|1分 5秒|>|182|32|\n';
+	//teststr += '|>|Nightmare Sheep&br;とても強い|1分 6秒|6025|182|33|b\n';
+	//teststr += '|~|~|1分 6秒|1|1|33|\n';
+	//teststr += '|a|a|1分11秒|5275|181|~|\n';
+	//teststr += '|Vanguard Liberator|4分 3秒|4分 3秒|180|180|~|f\n';
 
-} else { // DEBUG START ----------------------------------------------
+	var s = '';
+	s += '|>|あああ|いいい|\n';
+	s += '|>|みさくらなんこつ|とんこつ|\n';
+	s += '|~|~|ああ|';
 
-//var teststr = '';
-//teststr += '|CENTER:|CENTER:|CENTER:|CENTER:|CENTER:|CENTER:|c\n';
-//teststr += '|キャラクタ|戦闘時間計|平均戦闘時間|総経験値|平均|討伐数|h\n';
-//teststr += '|LEFT:|CENTER:|RIGHT:|RIGHT:|RIGHT:|RIGHT:|c\n';
-//teststr += '|Nightmare Funguar|33分51秒|1分 5秒|>|182|32|\n';
-//teststr += '|>|Nightmare Sheep&br;とても強い|1分 6秒|6025|182|33|b\n';
-//teststr += '|~|~|1分 6秒|1|1|33|\n';
-//teststr += '|a|a|1分11秒|5275|181|~|\n';
-//teststr += '|Vanguard Liberator|4分 3秒|4分 3秒|180|180|~|f\n';
-//var ret = tablemaker.make(teststr, 0);
-//var f = v2c.getScriptDataFile('resultTable.txt');
-//v2c.writeStringToFile(f, ret);
-
-
-//v2c.println('completed.');
-
-} // DEBUG END ---------------------------------------------------------
-
+	var wp = v2c.context.thread.openWritePanel();
+	var stime = new Date();
+	wp.message.text = tablemaker.make(s, 4);
+	var etime = new Date();
+	wp.preview = true;
+	log('completed. (処理時間: {0}ミリ秒)', etime - stime);
+}
+MODE();
 })();
