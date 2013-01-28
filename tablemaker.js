@@ -1,6 +1,6 @@
 //【登録場所】選択テキスト
 //【ラベル】選択範囲を表に変換する
-//【更新日】2013/01/26 (version 0.80b alpha)
+//【更新日】2013/01/28 (version 0.85 alpha)
 //【コマンド】$SCRIPT tablemaker.js $TAILCUT
 //【コマンド】[↑がオススメ。コピペも出来てコンパクト。テンプレ用途]
 //【コマンド】$SCRIPT tablemaker.js $USE_UNICODE $STYLE(0) $TAILCUT
@@ -18,14 +18,18 @@
 //    ■引数 $STYLE(数字) … 表の形式を指定する
 //      $STYLE(0) … 罫線や区切り文字を使用せず表を作成する。(なるべくドット等のゴミが出ないように最適化してある)
 //      $STYLE(1) … 区切り文字を使用して表を作成する。
+//      $STYLE(21) … 「|----|」または「+----+ (USE_UNICODE時)」な罫線を内枠・外枠に使用して表を作成する。( $STYLE(2) だとこれ )
+//      $STYLE(31) … 「┼─┼」な罫線を内枠・外枠に使用して表を作成する。( $STYLE(3) だとこれ )
 //      $STYLE(41) … 「╋━╋」な罫線を外枠とヘッダー及びフッター行にのみ使用して表を作成する。 ( $STYLE(4) だとこれ )
-//    [未実装]     $STYLE(20) … 「+----+」な罫線を内枠にのみ使用して表を作成する。( $USE_UNICODE時のみ )
-//    [未実装]     $STYLE(21) … 「+----+」な罫線を内枠・外枠に使用して表を作成する。( $STYLE(2) だとこれ )( $USE_UNICODE時のみ )
+//      $STYLE(51) … 「╋━╋」な罫線を内枠・外枠に使用して表を作成する。 ( $STYLE(5) だとこれ )
+//    [未実装]     $STYLE(20) … 「|----|」または「+----+ (USE_UNICODE時)」な罫線を内枠にのみ使用して表を作成する。
 //    [未実装]     $STYLE(30) … 「┼─┼」な罫線を内枠にのみ使用して表を作成する。
-//    [未実装]     $STYLE(31) … 「┼─┼」な罫線を内枠・外枠に使用して表を作成する。( $STYLE(3) だとこれ )
 //    [未実装]     $STYLE(40) … 「╋━╋」な罫線をヘッダー及びフッター行にのみ使用して表を作成する。
 //    [未実装]     $STYLE(50) … 「╋━╋」な罫線を内枠にのみ使用して表を作成する。
-//    [未実装]     $STYLE(51) … 「╋━╋」な罫線を内枠・外枠に使用して表を作成する。 ( $STYLE(5) だとこれ )
+//    [未実装]     $STYLE(22) … 「|----|」または「+----+ (USE_UNICODE時)」な罫線を外枠とヘッダーフッター行のみ水平罫線を使用して表を作成する。
+//    [未実装]     $STYLE(32) … 「┼─┼」な罫線を外枠とヘッダーフッター行のみ水平罫線を使用して表を作成する。
+//    [未実装]     $STYLE(42) … 「╋━╋」な罫線を外枠とヘッダーフッター行のみ水平罫線を使用して表を作成する。
+//    [未実装]     $STYLE(52) … 「╋━╋」な罫線を外枠とヘッダーフッター行のみ水平罫線を使用して表を作成する。
 //
 //【内容】選択範囲のpukiwikiライクな書式のテキストを罫線表に変換する 
 // ■ワンポイントアドバイス…変換した後、表を元の文字列に戻したい場合は「CTRL + Z 」キーを２回押すと戻せる
@@ -36,11 +40,11 @@
 // |２行目|は|こんな|感じ|
 // |CENTER:方向指定を|LEFT:直接|CENTER:セルに書くことも|RIGHT:できる|
 // 
-// [未実装] ■直下に水平線の挿入…末尾に「b」を付ける
-// (罫線モード時のみ実装済み)
+// ■直下に水平線の挿入…末尾に「b」を付ける、又は全てのセルの文字列の頭に「~」を付ける
 // |直下に線を挿入する場合は|こんな|ふうに|やる|b
+// |~全部|~うにょうにょを|~入れないと|~入らない|
 // 
-// [未実装] ■改行…「&br;」を入れると改行される。罫線モード時のみ有効
+// ■改行…「&br;」を入れると改行される。罫線モード時のみ有効
 // セル垂直結合時のみ表示される。それ以外で使うと&br;以降の文字は削除される
 // |項目１&br;2行目です|項目２|項目３|項目４|
 // |~|こんなふうにセル結合しないと|削除|される|
@@ -70,7 +74,7 @@
 // [未実装] ■post.jsでに実装して本文中で「!table」みたいなコマンドを入れて書き込むと
 // 表に変換する機能。(変換したあと書き込みはキャンセルさせる。書き込み欄が表に変わってるので
 // 再度書き込みボタン押すと書き込めるみたいな
-(function() { var DEBUG = undefined, MODE = (function() { DEBUG = 0; main(); });
+(function () { var DEBUG = undefined, MODE = (function() { DEBUG = 0; main(); });
 // --[ 設定ここから ]--------------------------------------------------------
 
 // デバッグ時は以下のモードのいずれかの先頭の「//」を消す
@@ -725,10 +729,12 @@ function makeSpace(dot, align)
 		ret = ret.split('').reverse().join('');
 	}
 	if (((align & HEAD) > 0) && (ret.charAt(0) == ' ')) {
-		ret = '_' + ret.substring(1);
+		//ret = '_' + ret.substring(1);
+		ret = '..' + ret.substring(1);
 	}
 	if (((align & TAIL) > 0) && (ret.charAt(ret.length - 1) == ' ')) {
-		ret = ret.substring(0, ret.length - 1) + '_';
+		//ret = ret.substring(0, ret.length - 1) + '_';
+		ret = ret.substring(0, ret.length - 1) + '..';
 	}
 	return ret;
 }
@@ -825,17 +831,71 @@ function KeisenObject()
 
 var KeisenRule = {
 	RuleName : 'KeisenRule',
+	HCLen : 16,
+	CCLen : 16,
+	KCT : {
+		"┌" : "┌",
+		"┬" : "┬",
+		"┐" : "┐",
+		"─" : "─",
+		"├" : "├",
+		"┼" : "┼",
+		"┤" : "┤",
+		"│" : "│",
+		"└" : "└",
+		"┴" : "┴",
+		"┘" : "┘",
+		"┏" : "┏",
+		"┳" : "┳",
+		"┓" : "┓",
+		"━" : "━",
+		"┣" : "┣",
+		"╋" : "╋",
+		"┫" : "┫",
+		"┃" : "┃",
+		"┗" : "┗",
+		"┻" : "┻",
+		"┛" : "┛",
+		"┠" : "┠",
+		"╂" : "╂",
+		"┨" : "┨",
+		"┰" : "┰",
+		"┸" : "┸",
+		"┝" : "┝",
+		"┿" : "┿",
+		"┥" : "┥",
+		"┯" : "┯",
+		"┷" : "┷",
+	},
+	setKCT : function(StrOrArray) {
+		// こんな感じの文字をセット '┌┬┐─├┼┤│└┴┘┏┳┓━┣╋┫┃┗┻┛┠╂┨┰┸┝┿┥┯┷';
+		var i = 0;
+		this.HCLen = StrToDotEx(StrOrArray[3]);
+		this.CCLen = StrToDotEx(StrOrArray[0]);
+		if (DEBUG) {
+			for (var n in this.KCT) {
+				put('\n　　【{0}】{1} → {2}', n, this.KCT[n], StrOrArray[i]);
+				i++;
+			}
+			if (i != StrOrArray.length) { logFunc('setKCT', '　KCT要素数が一致しません。(KCT.length = {0}, StrOrArray.length = {1})', i, StrOrArray.length); }
+			logFunc('setKCT', '　Rule : {0}のKCTを再定義しました。(水平罫線１個分のwidth={2}, 境界罫線１個分のwidth={3}){1}', this.RuleName, getStoreString(), this.HCLen, this.CCLen);
+			i = 0;
+		}
+		for (var n in this.KCT) {
+			this.KCT[n] = StrOrArray[i++];
+		}
+	},
 	DefineHorizontalLine : function(cell, hAlign, isBold) {
 		var base = '';
 		if (!cell.mergeLinks[hAlign]) {
 			if (cell[hAlign]) {
 				if (isBold) {
-					base = '━';	/* ヘッダー隣接セルの上 */
+					base = this.KCT['━'];	/* ヘッダー隣接セルの上 */
 				} else {
-					base = '─';	/* 内枠でセルの上 */
+					base = this.KCT['─'];	/* 内枠でセルの上 */
 				}
 			} else {
-				base = '━';	/* 外枠でセルの上 */
+				base = this.KCT['━'];	/* 外枠でセルの上 */
 			}
 		}
 		return base;
@@ -845,12 +905,12 @@ var KeisenRule = {
 		if (!cell.mergeLinks[vAlign]) {
 			if (cell[vAlign]) {
 				if (isBold) {
-					base = '┃';	/* 内枠でセルの左(区切り線) */
+					base = this.KCT['┃'];	/* 内枠でセルの左(区切り線) */
 				} else {
-					base = '│';	/* 内枠でセルの左(区切り線) */
+					base = this.KCT['│'];	/* 内枠でセルの左(区切り線) */
 				}
 			} else {
-				base = '┃';	/* 外枠左端のセルの左 */
+				base = this.KCT['┃'];	/* 外枠左端のセルの左 */
 			}
 		}
 		return base;
@@ -880,26 +940,26 @@ var KeisenRule = {
 		var vReverse = (vAlign == 'bottom')? 1 : 0;
 		
 		/* 左上用のみ定義してあとは反転させる */
-		var str = ['┿','┼','┯','┣','┠','┏'];
+		var str = [this.KCT['┿'], this.KCT['┼'], this.KCT['┯'], this.KCT['┣'], this.KCT['┠'], this.KCT['┏']];
 		if (cell.mergeLinks[hAlign]) {
 			if (cell.mergeLinks[vAlign]) {
 				return '';
 			} else if (cell[vAlign] && cell[vAlign].mergeLinks[hAlign]) {
-				str.splice(0, 3, '━','─','━');
+				str.splice(0, 3, this.KCT['━'], this.KCT['─'], this.KCT['━']);
 			} else {
-				str.splice(0, 3, '┷','┴','━');
+				str.splice(0, 3, this.KCT['┷'], this.KCT['┴'], this.KCT['━']);
 			}
 		} else {
 			if (cell.mergeLinks[vAlign]) {
 				if (cell[hAlign] && cell[hAlign].mergeLinks[vAlign]) {
-					str.splice(0, 5, '│','│','┯','┃','┃');
+					str.splice(0, 5, this.KCT['│'], this.KCT['│'], this.KCT['┯'], this.KCT['┃'], this.KCT['┃']);
 				} else {
-					str.splice(0, 5, '┥','┤','┯','┃','┃');
+					str.splice(0, 5, this.KCT['┥'], this.KCT['┤'], this.KCT['┯'], this.KCT['┃'], this.KCT['┃']);
 				}
 			} else if (cell[hAlign] && cell[hAlign].mergeLinks[vAlign]) {
-				str.splice(0, 2, '┝','├');
+				str.splice(0, 2, this.KCT['┝'], this.KCT['├']);
 			} else if (cell[vAlign] && cell[vAlign].mergeLinks[hAlign]) {
-				str.splice(0, 2, '┯','┬');
+				str.splice(0, 2, this.KCT['┯'], this.KCT['┬']);
 			}
 		}
 		if (cell[hAlign]) {
@@ -950,141 +1010,114 @@ var KeisenRule = {
 		return this.DefineCorner(cell, 'right', 'bottom', (cell.bottom && (cell.header || cell.bottom.footer || cell.nextline)));
 	},
 	MergeMove : function(ltCell) {
-		// mergeLinks.rightがない。かつleftかbottomがある。つまり右上基点にしたほうが処理に無駄がないかも…
-		// そのうち直す
-		if (!ltCell.isMergeable ) { 
-			if (DEBUG) {
-				if (STOREMES.length > 0) {
-					logFunc('MergeMove', '{0}　なし、または処理済み。', getStoreString());
-				}
+		if (ltCell.mergeLinks.right || ltCell.mergeLinks.top ||  (!(ltCell.mergeLinks.left || ltCell.mergeLinks.bottom))) {
+			if (DEBUG && STOREMES.length > 0) {
+				if (ltCell.mergeLinks.right) { put('　結合処理は右上のセルを基点にするのでスキップします。'); }
+				else if (ltCell.mergeLinks.top) { put('　結合処理済み。'); }
+				else { put('　なし。'); }
+				logFunc('MergeMove', '{0}', getStoreString());
 			}
-			return false;
+			return true;
 		}
-		var cell = ltCell;
-		var lines = 1;
-		var w = 0;
+		var cell = ltCell;	// セル処理用
+		var lines = 1;		// 結合後の行数
+		var w = ltCell.width;			// 結合後のセル幅
+		var tmp = null;		// 汎用
 		if (DEBUG) {
-			var debug_num = 0;
-			var debug_tmp = ltCell;
-			do { debug_num++; } while (debug_tmp = debug_tmp.mergeLinks.bottom);
-			put('　[結合セル:(行数={0}×', debug_num);
-			debug_num = 0;
-			debug_tmp = ltCell;
-			do { debug_num++; } while (debug_tmp = debug_tmp.mergeLinks.right);
-			put('列数={0})]', debug_num);
+			var tmp = 0;
+			do { tmp++; } while (cell = cell.mergeLinks.bottom);
+			put('　[結合セル:(行数={0}×', tmp);
+			tmp = 0;
+			cell = ltCell;
+			do { tmp++; } while (cell = cell.mergeLinks.left);
+			put('列数={0})]', tmp);
+			cell = ltCell;
 		}
-		if (ltCell.mergeLinks.right) {
-			while (cell.mergeLinks.right) {
-				w += cell.width + 16;
+		if (ltCell.mergeLinks.left) {
+			w = 0;
+			while (cell = cell.mergeLinks.left) {
+				w += cell.width + this.CCLen;
 				cell.width = 0;
-				cell = cell.mergeLinks.right;
-				cell.mergeLinks.left.mergeLinks.right = null;
-				cell.mergeLinks.left = null;
 			}
-			
 			// 結合による列幅の再計算
-			var max = 0;
-			var coltmp = cell;
-			while (coltmp = coltmp.top) { 
-				if (coltmp.rawText.textDots > max) 
-					max = coltmp.rawText.textDots;
-				if (!coltmp.top)
-					break;
+			var max = 0;			// 基点セルの列の最大幅
+			tmp = cell = ltCell;	// 基点セルの最上段のセル(ループ用)
+			while (tmp.top) {
+				tmp = tmp.top;
+				if (tmp.rawText.textDots > max) 
+					max = tmp.rawText.textDots;
 			}
-			if (!coltmp) { coltmp = cell; }
-			var tmp = cell;
-			while (tmp = tmp.bottom) { if (tmp.rawText.textDots > max) max = tmp.rawText.textDots; }
-			if (cell.textDots > max) {
-				var num = Math.floor((cell.textDots - max) >> 4);
-				var cbk = num << 4;
-				var lbk = (w >> 4) << 4;
-				if (cbk > lbk) {
+			while (cell = cell.bottom) { if (cell.rawText.textDots > max) max = cell.rawText.textDots; }
+			if (ltCell.textDots > max) {
+				var num = Math.floor((ltCell.textDots - max) / this.HCLen);
+				var cbk = num * this.HCLen;
+				var lbk = Math.floor(w / this.HCLen) * this.HCLen;
+				if (cbk > lbk) { 
 					cbk = lbk;
-					num = lbk >> 4;
+					num = Math.floor(lbk / this.HCLen);
 				}
-				put('[結合による列幅の調整:width({0} → {1})、引かれる罫線文字数:{2}]', coltmp.width, coltmp.width - cbk, num);
-				tmp = coltmp;
+				put('[結合による列幅の調整:width({0} → {1})、引かれる罫線文字数:{2}]', tmp.width, tmp.width - cbk, num);
+				cell = tmp;
 				var n;
 				do {
-					if (tmp.keisenLinks.top) {
-						n = tmp.keisenLinks.top.text;
-						tmp.keisenLinks.top.text = n.substr(0, n.length - num);
+					if (cell.keisenLinks.top) {
+						n = cell.keisenLinks.top.text;
+						cell.keisenLinks.top.text = n.substr(0, n.length - num);
 					}
-					if (tmp === cell) { continue; }
-					tmp.width -= cbk;
-					if (!tmp.bottom) break;
-				} while (tmp = tmp.bottom);
-				if (tmp.keisenLinks.bottom) {
-					n = tmp.keisenLinks.bottom.text;
-					tmp.keisenLinks.bottom.text = n.substr(0, n.length - num);
+					if (cell === ltCell) { continue; }
+					cell.width -= cbk;
+					if (!cell.bottom) break;
+				} while (cell = cell.bottom);
+				if (cell.keisenLinks.bottom) {
+					n = cell.keisenLinks.bottom.text;
+					cell.keisenLinks.bottom.text = n.substr(0, n.length - num);
 				}
 				w -= cbk;
 			}
-			cell.width = w = cell.width + w;
+			ltCell.width = w = ltCell.width + w;
 			put('[結合後のセル幅:width={0}]', w);
-			logFunc('MergeMove', '{0}', getStoreString());
-			tmp = cell;
-			while (tmp = tmp.mergeLinks.bottom) {
+		}
+		logFunc('MergeMove', '{0}', getStoreString());
+		if (ltCell.mergeLinks.bottom) {
+			cell = ltCell;
+			while (cell = cell.mergeLinks.bottom) {
 				lines += 2;
-				tmp.keisenLinks.top.text = makeSpace(w, LEFT, USE_UNICODE);
-				tmp.width = w;
-				var tmp2 = tmp;
-				while (tmp2.mergeLinks.left && tmp2.left.mergeLinks.top) {
-					tmp2 = tmp2.left;
-					tmp2.width = 0;
-					tmp2.mergeLinks.top.mergeLinks.bottom = null;
-					tmp2.mergeLinks.top = null;
-					tmp2.mergeLinks.right.mergeLinks.left = null;
-					tmp2.mergeLinks.right = null;
+				cell.keisenLinks.top.text = makeSpace(w, LEFT, USE_UNICODE);
+				cell.width = w;
+				var tmp = cell;
+				while (tmp.mergeLinks.left && tmp.left.mergeLinks.top) {
+					tmp = tmp.left;
+					tmp.width = 0;
 				}
-				tmp.mergeLinks.top.mergeLinks.bottom = null;
-				tmp.mergeLinks.top = null;
 			}
 			logFunc('MergeMove', '　　　結合セルの罫線を空白に変更しました。');
-			// 結合セルの上下の中央に文字列を移動させる。　+1で4の倍数ならkeisenLinks.topに書き込む(奇数セル単位行)、それ以外はtext
-			var idx = Math.floor((lines + 1) / 4);
-			if (idx > 0) {
-				put('このセル基点で行数＋{0}のセル',idx);
-				tmp = cell;
-				while (idx--) { tmp = tmp.bottom; }
-				if ((lines + 1) % 4 == 0) {
-					tmp.keisenLinks.top.text = cell.getPaddingText();
-					put('の罫線行(上)に');
-				} else {
-					tmp.text = cell.text;
-					put('に');
+			if (lines > 1) {
+				put('[lines:{0}]', lines);
+				var ins = (ltCell.length > lines)? lines : ltCell.length;	//挿入行数
+				//var el = ((lines + 1) >> 1) + (ins >> 1);		//最終行(lines単位) (ネガティブ:下の行に先に挿入する)
+				var el = ((lines + 1) >> 1) + ((ins - 1) >> 1);		//最終行(lines単位) (ポジティブ:上の行に先に挿入する)
+				var remove = (el - (ins - 1)) != 1;
+				put('[範囲行:{0} → {1}]', el - (ins - 1), el);
+				logFunc('MergeMove', '　　　{0}[挿入行数:{1}] 文字列の再配置。及び複数行の反映。', getStoreString(), ins);
+
+				for (var n = ins - 1; n >= 0; n--,el--) {
+					var idx = el >> 1;
+					cell = ltCell;
+					put('[line:{0}, idx:{1}, 上:{2}]', el, idx, (n%2==0)? 'yes' : 'no');
+					while (idx--) { cell = cell.bottom; }
+					put('　セル({0}, {1})', cell.rowIndex, cell.columnIndex);
+					if (el % 2 == 0) {
+						put('の罫線行(上)に');
+						cell.keisenLinks.top.text = ltCell.getRawText(n).getPaddingText();
+					} else {
+						put('に');
+						cell.text = ltCell.getRawText(n).getPaddingText();
+					}
+					logFunc('MergeMove', '　　　{0}基準セルの{1}行目の文字列(行数={2})を配置しました。', getStoreString(), n + 1, ltCell.length);
 				}
-				logFunc('MergeMove', '　　　{0}セルの文字列を再配置しました。', getStoreString());
-				if (cell != tmp) {
-					cell.text = '';
-				}
-			}
-		} else if (ltCell.mergeLinks.bottom) {
-			var tmp = cell;
-			w = cell.width;
-			while (tmp = tmp.mergeLinks.bottom) {
-				lines += 2;
-				tmp.keisenLinks.top.text = makeSpace(w, LEFT, USE_UNICODE);
-				tmp.width = w;
-				tmp.mergeLinks.top.mergeLinks.bottom = null;
-				tmp.mergeLinks.top = null;
-			}
-			logFunc('MergeMove', '　　　結合セルの罫線を空白に変更しました。');
-			var idx = Math.floor((lines + 1) / 4);
-			if (idx > 0) {
-				put('このセル基点で行数＋{0}のセル',idx);
-				tmp = cell;
-				while (idx--) { tmp = tmp.bottom; }
-				if ((lines + 1) % 4 == 0) {
-					put('の罫線行(上)に');
-					tmp.keisenLinks.top.text = cell.getPaddingText();
-				} else {
-					put('に');
-					tmp.text = cell.text;
-				}
-				logFunc('MergeMove', '　　　{0}セルの文字列を再配置しました。', getStoreString());
-				if (cell != tmp) {
-					cell.text = '';
+				if (remove) {
+					logFunc('MergeMove', '　　　基準セルの1行目の文字列が再配置されたので。このセルの文字列を消しました。');
+					ltCell.text = '';
 				}
 			}
 		}
@@ -1100,6 +1133,7 @@ var KeisenRule = {
 		do { if (!cell.top) { break; } } while (cell = cell.top);
 		var tmp = cell;
 		var overDots = 0;
+		var hclen = StrToDotEx(this.Top(cell));
 		do {
 			tmp = cell;
 			if (overDots) {
@@ -1109,7 +1143,7 @@ var KeisenRule = {
 			for (; tmp; tmp = tmp.bottom) {
 				tmp.width = width;
 				if (tmp.overDots) {
-					overDots = 16;
+					overDots = this.HCLen;
 					break;
 				}
 			}
@@ -1152,47 +1186,58 @@ function Padding()
 function RawText(text)
 {
 	var that = this;
-	var _text, _dots;
-	this.paddingLeft = new Padding();
-	this.paddingRight= new Padding();
+	var _text = '', _dots = 0;
+	var __paddingLeft = new Padding();
+	var __paddingRight= new Padding();
+
 	this.__defineGetter__("text", function() { return _text; });
 	this.__defineSetter__("text", function(val) {
 		_text = val;
 		_dots = StrToDotEx(_text);
 	});
-	this.__defineGetter__("overDots", function() { return (that.paddingLeft.overLength + that.paddingRight.overLength); });
+	this.__defineGetter__("paddingLeft", function() { return __paddingLeft; });
+	this.__defineGetter__("paddingRight", function() { return __paddingRight; });
+	this.__defineGetter__("overDots", function() { return (__paddingLeft.overLength + __paddingRight.overLength); });
 	this.__defineGetter__("textDots", function() { return _dots; });
-	this.__defineGetter__("width", function() { return that.paddingLeft.width + that.textDots + that.paddingRight.width; });
+	this.__defineGetter__("width", function() { return __paddingLeft.width + that.textDots + __paddingRight.width; });
 	this.calcPadding = function(val, align) {
 		var len = val - that.textDots;
+		if (that.textDots == 0) {
+			align = LEFT;
+		} else {
+			if ((align & (LEFT | CENTER)) > 0 && that.text.charAt(that.text.length - 1) == ' ') {
+				__paddingRight.align |= HEAD;
+			}
+			if ((align & (RIGHT | CENTER)) > 0 && that.text.charAt(0) == ' ') {
+				__paddingLeft.align |= TAIL;
+			}
+		}
 		switch (align) {
 			case LEFT :
-				that.paddingLeft.width = 0;
 				if (len <= 0) {
 					val = that.textDots;
-					that.paddingRight.width = 0;
+					__paddingRight.width = 0;
 				} else {
-					that.paddingRight.width = len;
+					__paddingRight.width = len;
 				}
 				break;
 			case RIGHT :
-				that.paddingRight.width = 0;
 				if (len <= 0) {
 					val = that.textDots;
-					that.paddingLeft.width = 0;
+					__paddingLeft.width = 0;
 				} else {
-					that.paddingLeft.width = len;
+					__paddingLeft.width = len;
 				}
 				break;
 			case CENTER :
 				if (len <= 0) { 
 					val = that.textDots;
-					that.paddingLeft.width = that.paddingRight.width = 0;
+					__paddingLeft.width = __paddingRight.width = 0;
 				} else {
-					var len2 = Math.floor(len / 2);
-					that.paddingLeft.width = len2;
+					var len2 = len >> 1
+					__paddingLeft.width = len2;
 					if ((len % 2) == 1) len2++;
-					that.paddingRight.width = len2;
+					__paddingRight.width = len2;
 				}
 				break;
 			default:
@@ -1201,7 +1246,7 @@ function RawText(text)
 		return val;
 	};
 	this.getPaddingText = function() {
-		return that.paddingLeft.getText() + that.text + that.paddingRight.getText();
+		return __paddingLeft.getText() + that.text + __paddingRight.getText();
 	};
 
 	that.text = text;
@@ -1273,9 +1318,11 @@ function Cell(value)
 	var _rawTextCollection = new RawTextCollection();
 	var _width = 0;
 	var _align = LEFT;
-	var  _nextline = false;
+	var _nextline = false;
 	this.header = false;
 	this.footer = false;
+	this.rowIndex = 0;		// 結合前のインデックス
+	this.columnIndex = 0;	// 結合前のインデックス
 	this.borderStyle = 0;		// 0～1 = なし、 2以降 = +---+ or ┼─┼ or ╋━╋
 
 	this.getRawText = function() { return _rawTextCollection.getText(arguments[0]); };
@@ -1286,7 +1333,7 @@ function Cell(value)
 	this.__defineSetter__("text", function(val) {
 		that.width = _rawTextCollection.setText(val, that.width, that.align);
 	});
-	this.__defineGetter__("lineCount", function() { return _rawTextCollection.length; });
+	this.__defineGetter__("length", function() { return _rawTextCollection.length; });
 
 	this.__defineGetter__("overDots", function() { return _rawTextCollection.overDots; });
 	this.__defineGetter__("textDots", function() { return _rawTextCollection.getTextDots(); });
@@ -1304,10 +1351,11 @@ function Cell(value)
 	this.__defineSetter__("align", function(val) {
 		_align = val;
 		if (_align == CENTER || _align == LEFT) {
-			_rawTextCollection.leftAlign = ((!that.left) && (that.borderStyle < 2))? LEFT | HEAD : LEFT;
+			_rawTextCollection.rightAlign = ((!that.right) && (that.borderStyle < 2))? RIGHT | TAIL : RIGHT;
 		}
 		if (_align == CENTER || _align == RIGHT) {
-			_rawTextCollection.rightAlign = ((!that.right) && (that.borderStyle < 2))? RIGHT | TAIL : RIGHT;
+			_rawTextCollection.leftAlign = ((!that.left) && (that.borderStyle < 2))? LEFT | HEAD : LEFT;
+			
 		}
 	});
 	/* linklist */
@@ -1347,40 +1395,73 @@ var tablemaker = {
 		var ret = '';
 		put('[STYLE = {0}][[Separetor = {1}][TAILCUT = {2}][PREVIEW = {3}][USE_UNICODE = {4}]',
 		 borderStyle, SEPARATOR, TAILCUT, PREVIEW, USE_UNICODE);
-		
+//    [未実装]     $STYLE(20) … 「|----|」または「+----+ (USE_UNICODE時)」な罫線を内枠にのみ使用して表を作成する。
+//    [未実装]     $STYLE(30) … 「┼─┼」な罫線を内枠にのみ使用して表を作成する。
+//    [未実装]     $STYLE(40) … 「╋━╋」な罫線をヘッダー及びフッター行にのみ使用して表を作成する。
+//    [未実装]     $STYLE(50) … 「╋━╋」な罫線を内枠にのみ使用して表を作成する。
+//    [未実装]     $STYLE(22) … 「|----|」または「+----+ (USE_UNICODE時)」な罫線を外枠とヘッダーフッター行のみ水平罫線を使用して表を作成する。
+//    [未実装]     $STYLE(32) … 「┼─┼」な罫線を外枠とヘッダーフッター行のみ水平罫線を使用して表を作成する。
+//    [未実装]     $STYLE(42) … 「╋━╋」な罫線を外枠とヘッダーフッター行のみ水平罫線を使用して表を作成する。
+//    [未実装]     $STYLE(52) … 「╋━╋」な罫線を外枠とヘッダーフッター行のみ水平罫線を使用して表を作成する。
 		switch (borderStyle) {
 			case 1 :
 				logFunc('make', '{0}[Rule = なし]  空白のみの表作成を開始します。', getStoreString());
 				ret = this.makeSeparatorTable(SEPARATOR);
 				break;
+			case 2 :
+			case 21:
+				KeisenRule.RuleName = 'KeisenRule(プラマイ)';
+				if (USE_UNICODE) {
+					KeisenRule.setKCT(["+", "+", "+", "-", "+", "+", "+", "&#8201;|&#8201;", "+", "+", "+", "+", "+", "+", "-", "+", "+", "+", "&#8201;|&#8201;", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+", "+"]);
+				} else {
+					KeisenRule.setKCT('|||-||||||||||-|||||||||||||||||');
+				}
+				logFunc('make', '{1}[Rule = {0}] 罫線を使用して表作成を開始します。', KeisenRule.RuleName, getStoreString());
+				ret = this.makeBorderTable(KeisenRule);
+				break;
+			case 3 :
+			case 31:
+				KeisenRule.RuleName = 'KeisenRule(細)';
+				KeisenRule.setKCT('┌┬┐─├┼┤│└┴┘┌┬┐─├┼┤│└┴┘├┼┤┬┴├┼┤┬┴');
+				logFunc('make', '{1}[Rule = {0}] 罫線を使用して表作成を開始します。', KeisenRule.RuleName, getStoreString());
+				ret = this.makeBorderTable(KeisenRule);
+				break;
 			case 4 :
 			case 41:
+				KeisenRule.RuleName = 'KeisenRule(複合)';
+				logFunc('make', '{1}[Rule = {0}(標準)] 罫線を使用して表作成を開始します。', KeisenRule.RuleName, getStoreString());
+				ret = this.makeBorderTable(KeisenRule);
+				break;
+			case 5 :
+			case 51:
+				KeisenRule.RuleName = 'KeisenRule(太)';
+				KeisenRule.setKCT('┏┳┓━┣╋┫┃┗┻┛┏┳┓━┣╋┫┃┗┻┛┣╋┫┳┻┣╋┫┳┻');
 				logFunc('make', '{1}[Rule = {0}] 罫線を使用して表作成を開始します。', KeisenRule.RuleName, getStoreString());
-				ret = this.makeBorderTable();
+				ret = this.makeBorderTable(KeisenRule);
 				break;
 			case 0 :
 			default :
 				logFunc('make', '{0}[Rule = なし] 空白のみの表作成を開始します。', getStoreString());
-				ret = this.makeSpaceTable(11);
+				ret = this.makeSpaceTable(22);
 				break;
 		}
 		return ret;
 	},
 	// 罫線を使用したテーブル
-	makeBorderTable : function() {
-		var rule = KeisenRule;
+	makeBorderTable : function(rule) {
 		var ret = '';
 		var cells = this.convCells(this.text, 21);
-		var cwmax = []
+		var cwmax = [];
+		var hclen = rule.HCLen;
 		for (var i = 0; i < this.maxwidthColumn.length; i++) {
-			cwmax.push(((this.maxwidthColumn[i] + 15) >> 4) << 4);	// 罫線が16dotなので16の倍数にする
+			cwmax.push(Math.floor((this.maxwidthColumn[i] + (hclen - 1)) / hclen) * hclen);	// 罫線が16dotなので16の倍数にする
 		}
 		if (cells && cells.length > 0 && cells[0] && cells[0].length > 0) {
 			// 文字ドット数の余剰分カラムサイズを補正する
 			
 			for (var col = 0; col < cwmax.length; col++) {
 				cwmax[col] = rule.detectWidthCellsForBorder(cells[0][col], cwmax[col]);
-				put('[width = {0}]', cwmax[col]);
+				put('[width={0}]', cwmax[col]);
 			}
 			logFunc('makeBorderTable', '{0}　列の最大幅を仮決定しました。結合時は変更する可能性があります。', getStoreString());
 			// 罫線の作成
@@ -1391,8 +1472,8 @@ var tablemaker = {
 					item.keisenLinks.left.text = rule.Left(item);
 					var c = rule.Top(item);
 					var t = cwmax[col];
-					put('　罫線リンク → ({4}, {5}) [左上="{1}"][上="{2}"×{3}][左="{0}"]', item.keisenLinks.left.text, item.keisenLinks.leftTop.text, c, Math.floor(t / 16), row, col);
-					while (t > 0) { item.keisenLinks.top.text += c; t -= 16; } 
+					put('　罫線リンク → ({4}, {5}) [左上="{1}"][上="{2}"×{3}][左="{0}"]', item.keisenLinks.left.text, item.keisenLinks.leftTop.text, c, Math.floor(t / hclen), row, col);
+					while (t > 0) { item.keisenLinks.top.text += c; t -= hclen; } 
 					if (!item.right) {
 						item.keisenLinks.rightTop.text = rule.RightTop(item);
 						item.keisenLinks.right.text = rule.Right(item);
@@ -1402,8 +1483,8 @@ var tablemaker = {
 						item.keisenLinks.leftBottom.text = rule.LeftBottom(item);
 						c = rule.Bottom(item);
 						t = cwmax[col];
-						put('[下="{0}"×{1}]', c, Math.floor(t / 16));
-						while (t > 0) { item.keisenLinks.bottom.text += c; t -= 16; }
+						put('[下="{0}"×{1}]', c, Math.floor(t / hclen));
+						while (t > 0) { item.keisenLinks.bottom.text += c; t -= hclen; }
 						if (!item.right) {
 							put('[右下="{0}"]', item.keisenLinks.rightBottom.text);
 							item.keisenLinks.rightBottom.text = rule.RightBottom(item);
@@ -1447,10 +1528,12 @@ var tablemaker = {
 	makeSeparatorTable : function(separator) {
 		var ret = '';
 		var cells = this.convCells(this.text, 1);
+		var len = (this.maxwidthColumn.length - 1) * StrToDotEx(separator);
 		if (cells && cells.length > 0 && cells[0] && cells[0].length > 0) {
 			for (var col = 0; col < cells[0].length; col++) {
 				var tmp = this.detectWidthCells(cells, col, this.maxwidthColumn[col]);
-				put('[width = {0}]', tmp);
+				put('[width={0}]', tmp);
+				len += tmp;
 			}
 			logFunc('makeSeparatorTable', '{0}　列の最大幅を決定しました。', getStoreString());
 			if (TAILCUT) {
@@ -1462,12 +1545,21 @@ var tablemaker = {
 				}
 				logFunc('makeSeparatorTable', '{0}　$TAILCUT指定なので各行の末尾の空白を削除しました。', getStoreString());
 			}
+			logFunc('mkeSeparatorTable', '　({0}, {1}) [{2} - {3} - {4}] = "{5}"', 9, 4, 
+				cells[9][4].rawText.paddingLeft.width, cells[9][4].rawText.textDots, cells[9][4].rawText.paddingRight.width,
+				cells[9][4].rawText.paddingRight.align);
 			for (var row = 0; row < cells.length; row++) {
+				if (cells[row][0].footer) {
+					ret += this.getNextLineString(len) + '\n';
+				}
 				for (var col = 0; col < cells[row].length; col++) {
 					if (col != 0) ret += separator;
 					ret += cells[row][col].getPaddingText();
 				}
 				ret += '\n';
+				if (cells[row][0].nextline || cells[row][0].header) {
+					ret += this.getNextLineString(len) + '\n';
+				}
 			}
 			ret = ret.substr(0, ret.length - 1);	// 最終行の改行コード削除
 			logFunc('makeSeparatorTable', '表文字列の変換処理が完了しました。');
@@ -1478,14 +1570,16 @@ var tablemaker = {
 	makeSpaceTable : function(margin) {
 		var ret = '';
 		var cells = this.convCells(this.text, 0);
-		var cwmax = []
+		var cwmax = [];
+		var len = 0;
 		for (var i = 0; i < this.maxwidthColumn.length; i++) {
 			cwmax.push(this.maxwidthColumn[i] + margin);		// marginのdot数分カラム幅を余裕を持たせる
 		}
 		if (cells && cells.length > 0 && cells[0] && cells[0].length > 0) {
 			for (var col = 0; col < cells[0].length; col++) {
 				var tmp = this.detectWidthCells(cells, col, cwmax[col]);
-				put('[width = {0}]', tmp);
+				put('[width={0}]', tmp);
+				len += tmp;
 			}
 			logFunc('makeSpaceTable', '{0}　列の最大幅を決定しました。', getStoreString());
 			// 各セルの向かい合ったPaddingを結合してゴミを出にくくする
@@ -1509,14 +1603,26 @@ var tablemaker = {
 			}
 			// 描画
 			for (var row = 0; row < cells.length; row++) {
+				if (cells[row][0].footer) {
+					ret += this.getNextLineString(len) + '\n';
+				}
 				for (var col = 0; col < cells[row].length; col++) {
 					ret += cells[row][col].getPaddingText();
 				}
 				ret += '\n';
+				if (cells[row][0].nextline || cells[row][0].header) {
+					ret += this.getNextLineString(len) + '\n';
+				}
 			}
 			ret = ret.substr(0, ret.length - 1);	// 最終行の改行コード削除
 			logFunc('makeSpaceTable', '表文字列の変換処理が完了しました。');
 		} else { logFunc('makeSpaceTable', '入力文字列からセルが作成できませんでした。\n----\n{0}\n----', this.text); }
+		return ret;
+	},
+	getNextLineString : function(width) {
+		var ret = '';
+		width = (width + 15) >> 4;
+		while (width-- > 0) { ret += '―'; }
 		return ret;
 	},
 	detectWidthCells : function(cells, columnIndex, width)
@@ -1612,6 +1718,7 @@ var tablemaker = {
 
 			var row = [];
 			var hmergePrev = false;
+			var nlCnt = 0;
 			for (var j = 0; j < items.length; j++) {
 				put('[');
 				var hmerge = false;
@@ -1631,16 +1738,20 @@ var tablemaker = {
 					put('右:');
 					str = str.substring(6);
 				}
-				if (borderStyle >= 2) {
-					if (str == '>') {
-						hmerge = true;
+				if (str == '>') {
+					if (borderStyle >= 2) hmerge = true;
+					str = '';
+				}
+				if (str.charAt(0) == '~') {
+					if (str.length == 1) {
+						if (borderStyle >= 2) vmerge = true;
 						str = '';
-					}
-					if (str == '~') {
-						vmerge = true;
-						str = '';
+					} else {
+						nlCnt++;
+						str = str.substring(1);
 					}
 				}
+				str = str.replace(/[ ]+/g, ' ').replace(/\\([>~])/, '$1');
 				var cell = new Cell(str);
 
 				if (cell.textDots > this.maxwidth) {
@@ -1649,6 +1760,8 @@ var tablemaker = {
 				if (cell.textDots > this.maxwidthColumn[j]) {
 					this.maxwidthColumn[j] = cell.textDots;
 				}
+				cell.rowIndex = i;
+				cell.columnIndex = j;
 				cell.borderStyle = borderStyle;
 				cell.align = ma;
 				cell.header = header;
@@ -1737,10 +1850,16 @@ var tablemaker = {
 				if (hmerge) {
 					hmergePrev = true;
 				}
-				put('_{0}]', cell.text);
+				put('width={1}_{0}]', cell.text, cell.rawText.width);
 				row.push(cell);
 			}
 			logFunc('convCells', '　{0}', getStoreString());
+			if (nlCnt == row.length) {
+				logFunc('convCells', '　　　文頭"~"が全てのセルにあったのでnextline属性を付けます。単一セルの「~」は対応する罫線文字が存在しないのでできません。');
+				for (var n = 0; n < row.length; n++) {
+					row[n].nextline = true;
+				}
+			}
 			rows.push(row);
 		}
 		logFunc('convCells', '文字列からCellに変換できました。');
@@ -1770,20 +1889,24 @@ function main()
 }
 function debug()
 {
-	//var teststr = '';
-	//teststr += '|CENTER:|CENTER:|CENTER:|CENTER:|CENTER:|CENTER:|c\n';
-	//teststr += '|キャラクタ|戦闘時間計|平均戦闘時間|総経験値|平均|討伐数|h\n';
-	//teststr += '|LEFT:|CENTER:|RIGHT:|RIGHT:|RIGHT:|RIGHT:|c\n';
-	//teststr += '|Nightmare Funguar|33分51秒|1分 5秒|>|182|32|\n';
-	//teststr += '|>|Nightmare Sheep&br;とても強い|1分 6秒|6025|182|33|b\n';
-	//teststr += '|~|~|1分 6秒|1|1|33|\n';
-	//teststr += '|a|a|1分11秒|5275|181|~|\n';
-	//teststr += '|Vanguard Liberator|4分 3秒|4分 3秒|180|180|~|f\n';
+/* 非罫線モードで水平線タイプをできるようにする？
+1行パターン
+._AColumn___._BColumn＿＿＿＿＿＿＿._CColumn＿_._DColumn._EColumn＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
+[AColumn. ][BColumn　　　　　　　　　 ][CColumn ][DColumn][EColumn　　　　　　　　　　　 ]
+または
+2行パターン
+AColumn　|BColumn　　　　　　　　　..|Column　|DColumn|EColumn　　　　　　　　　　　　　　　　　　　　　 　 .
+―――――――――――――――――――――――――――――――――――――――
+*/
 
 	var s = '';
-	s += '|>|あああ|いいい|\n';
-	s += '|>|みさくらなんこつ|とんこつ|\n';
-	s += '|~|~|ああ|';
+	s += '|~No.|~武器名|~Lv|~No|武器名|\n';
+	s += '|1|マンティス ●○&br;２行目&br;３行目&br;４行目&br;４行目|~|1|マンティス ●○&br;２行目&br;３行目&br;４行目|b\n';
+	s += '|3|~|~|3|~|\n';
+	s += '|5|~|~|5|~|\n';
+	s += '|7|~|~|7|~|\n';
+	s += '|9|~|~|9|~|\n';
+	s += '|11|レバナントフィスト ●○&br;(D+23 隔+55)|-|11|~|\n';
 
 	var wp = v2c.context.thread.openWritePanel();
 	var stime = new Date();
