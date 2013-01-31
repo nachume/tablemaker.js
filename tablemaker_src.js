@@ -2134,14 +2134,14 @@ if (JANEVIEW) {
 				if (num == global.STYLE) { return; }
 				for (var i = 0; i < JaneViewMenu.menuItem.length; i++) {
 					var item = JaneViewMenu.menuItem[i];
-					if (item.Gesturename.match(/fStyle(\d+)/i)) {
-						item.Checked = false;
+					if (item['Gesturename'].match(/fStyle(\d+)/i)) {
+						item['Checked'] = false;
 					}
 				}
 				global.STYLE = num;
 				o['Checked'] = true;
-				JaneViewMenu.ini.Write('General', 'STYLE', String(global.STYLE));
-				JaneViewMenu.ini.UpdateFile();
+				JaneViewMenu.ini['Write']('General', 'STYLE', String(global.STYLE));
+				JaneViewMenu.ini['UpdateFile']();
 			}
 		},
 		selectedConvert : function(o, t) {
@@ -2195,7 +2195,10 @@ function debug()
 //	2行パターン
 //	AColumn　|BColumn　　　　　　　　　..|Column　|DColumn|EColumn　　　　　　　　　　　　　　　　　　　　　 　 .
 //	―――――――――――――――――――――――――――――――――――――――
-
+//|>|あああああ|いい|
+//|うう|CENTER:ええ&br;おお|~|
+//|~|~|~|
+//|~|>|かーかかか|
 	var stime = new Date();
 	var s = '';
 	s += '|aaaa|bbb|ccc|h\n';

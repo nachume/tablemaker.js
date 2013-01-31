@@ -355,6 +355,26 @@ v2c.context.args;
 v2c.context.argLine;
 
 /**
+ * レス表示ペインオブジェクト
+ * @type {org_monazilla_v2c_V2CScriptResPane} レス表示ペインオブジェクト
+ * @const
+ */
+v2c.resPane;
+
+/**
+ * V2C レスパネル オブジェクト
+ * @nosideeffects
+ */
+var org_monazilla_v2c_V2CScriptResPane = {};
+
+/**
+ * V2C スレッド オブジェクト
+ * @type {org_monazilla_v2c_V2CScriptThreadItem} Threadアイテム
+ * @const
+ */
+org_monazilla_v2c_V2CScriptResPane.selectedThread;
+
+/**
  * V2C スレッド オブジェクト
  * @type {org_monazilla_v2c_V2CScriptThreadItem} Threadアイテム
  * @const
