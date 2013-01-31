@@ -12,14 +12,8 @@
 // *              v2c.resPaneで表示中のスレッドだけはなんとか取得出来る                               *
 // *--------------------------------------------------------------------------------------------------*
 (function() {
-<<<<<<< HEAD
 var __vstmmenud__ = v2c.getProperty('__V2C_SCRIPT_TABLE_MAKER_MENU_DYNAMIC__');
 if (__vstmmenud__) { return __vstmmenud__; }
-=======
-//var __vstmmenud__ = v2c.getProperty('__V2C_SCRIPT_TABLE_MAKER_MENU_DYNAMIC__');
-//if (__vstmmenud__) { return __vstmmenud__; }
->>>>>>> 9a7cafc7bc09e49b745ed06661b8c561258784d6
-
 
 var SwingGui = JavaImporter(Packages.javax.swing,
                             java.lang.Short,
