@@ -29,6 +29,7 @@ this.USER_KEISEN = '┌&br;┬&br;┐&br;─&br;├&br;┼&br;┤&br;│&br;└&
 this.STYLE = 0;
 this.PREVIEW = false;
 this.Run = MODE;
+this.DEBUG = (DEBUG == true && (MODE != timewatch));
 function log(format /*, ...*/)
 {
 	var args = arguments;
@@ -2103,7 +2104,7 @@ if (JANEVIEW) {
 			JaneViewMenu.addMenuItem(defstyles, '-', null, null, null);
 			JaneViewMenu.addMenuItem(defstyles, '半角文字の罫線', 'fStyle21', (global.STYLE == 21), JaneViewMenu.styleSelected);
 			JaneViewMenu.addMenuItem(defstyles, '細い罫線', 'fStyle31', (global.STYLE == 31), JaneViewMenu.styleSelected);
-			JaneViewMenu.addMenuItem(defstyles, 'ヘッダー行が太い罫線', 'fStyle41', (global.STYLE == 31), JaneViewMenu.styleSelected);
+			JaneViewMenu.addMenuItem(defstyles, 'ヘッダー行が太い罫線', 'fStyle41', (global.STYLE == 41), JaneViewMenu.styleSelected);
 			JaneViewMenu.addMenuItem(defstyles, '太い罫線', 'fStyle51', (global.STYLE == 51), JaneViewMenu.styleSelected);
 			JaneViewMenu.addMenuItem(defstyles, 'ユーザー指定罫線', 'fStyle91', (global.STYLE == 91), JaneViewMenu.styleSelected);
 			JaneViewMenu.addMenuItem(defstyles, '-', null, null, null);

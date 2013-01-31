@@ -12,8 +12,13 @@
 // *              v2c.resPaneで表示中のスレッドだけはなんとか取得出来る                               *
 // *--------------------------------------------------------------------------------------------------*
 (function() {
-var __vstmmenud__ = v2c.getProperty('__V2C_SCRIPT_TABLE_MAKER_MENU_DYNAMIC__');
-if (__vstmmenud__) { return __vstmmenud__; }
+
+var __vstmmenud__ = null;
+var DEBUG = callTableMaker().DEBUG;
+if (!DEBUG) {
+	__vstmmenud__ = v2c.getProperty('__V2C_SCRIPT_TABLE_MAKER_MENU_DYNAMIC__');
+	if (__vstmmenud__) { return __vstmmenud__; }
+}
 
 var SwingGui = JavaImporter(Packages.javax.swing,
                             java.lang.Short,
@@ -313,7 +318,7 @@ function createTableMakerMenu()
 }
 
 var __vstmmenud__ = new createTableMakerMenu();
-v2c.putProperty('__V2C_SCRIPT_TABLE_MAKER_MENU_DYNAMIC__', __vstmmenud__);
+if (!DEBUG) { v2c.putProperty('__V2C_SCRIPT_TABLE_MAKER_MENU_DYNAMIC__', __vstmmenud__); }
 return __vstmmenud__;
 
 })();
