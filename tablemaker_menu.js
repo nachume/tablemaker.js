@@ -174,7 +174,7 @@ function Settings()
 		tm.STYLE = (/^STYLE=(\d+)$/im.test(str)) ? parseInt(RegExp.$1) : tm.STYLE;
 		tm.PREVIEW = /^PREVIEW=(true|1)$/im.test(str);
 	}
-	function save(saveonly)
+	function save()
 	{
 		var tmp = [];
 		tmp.push('[General]');

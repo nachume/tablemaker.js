@@ -1961,7 +1961,7 @@ this.Convert = function(style) {
 	var converted = [];
 	var n = [];
 	for (var i = 0; i < selTextArray.length; i++) {
-		if (/^\|.*\|[hbf]?$/i.test(selTextArray[i])) {
+		if (/^\|.*\|[hbfc]?$/i.test(selTextArray[i])) {
 			n.push(selTextArray[i]);
 			continue;
 		} else if (n.length > 0) {
